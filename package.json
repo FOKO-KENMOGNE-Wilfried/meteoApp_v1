@@ -13,8 +13,12 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@primevue/themes": "^4.0.5",
     "autoprefixer": "^10.4.20",
+    "chart.js": "^4.4.4",
+    "chartjs": "^0.3.24",
     "postcss": "^8.4.41",
+    "primevue": "^4.0.5",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3"
   },

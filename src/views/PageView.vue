@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import type MeteoType from '@/utils/types/MeteoType'
 import API from '@/utils/API'
 
@@ -7,6 +7,8 @@ const api = new API()
 const countryName = ref<string>('')
 const data = ref<MeteoType>({})
 const displayCityInput = ref<boolean>(false)
+const dataHistory = ref<[]>([])
+const labelData = ref<[]>([])
 const leftSide = ref([
   {
     title: 'Meteo',
@@ -37,7 +39,7 @@ const rightSide = ref([
   },
   {
     title: 'Force du vent',
-    value: data.value.wind_speed || 0,
+    value: data.value.wind_speed || 0 + 'Km/h',
     image: '/icons/wind_power.svg'
   },
   {
@@ -52,6 +54,76 @@ const rightSide = ref([
   }
 ])
 
+const chartData = ref()
+const chartOptions = ref()
+
+const setChartData = () => {
+  return {
+    labels: labelData.value,
+    // labels: ['', '', '', '', '', '', ''],
+    datasets: [
+      {
+        label: '',
+        fill: true,
+        borderColor: 'yellow',
+        yAxisID: 'y1',
+        tension: 0.4,
+        data: dataHistory.value
+      }
+    ]
+  }
+}
+const setChartOptions = () => {
+  const documentStyle = getComputedStyle(document.documentElement)
+  const surfaceBorder = documentStyle.getPropertyValue('--p-content-border-color')
+
+  return {
+    stacked: false,
+    maintainAspectRatio: false,
+    aspectRatio: 0.6,
+    plugins: {
+      legend: {
+        labels: {
+          color: 'white'
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: 'white'
+        },
+        grid: {
+          color: surfaceBorder
+        }
+      },
+      y: {
+        type: 'linear',
+        display: false,
+        position: 'left',
+        ticks: {
+          color: 'white'
+        },
+        grid: {
+          color: surfaceBorder
+        }
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        ticks: {
+          color: 'white'
+        },
+        grid: {
+          drawOnChartArea: false,
+          color: surfaceBorder
+        }
+      }
+    }
+  }
+}
+
 watch(data, () => {
   rightSide.value = [
     {
@@ -61,7 +133,7 @@ watch(data, () => {
     },
     {
       title: 'Force du vent',
-      value: data.value.wind_speed || 0,
+      value: data.value.wind_speed || 0 + 'Km/h',
       image: '/icons/wind_power.svg'
     },
     {
@@ -90,9 +162,55 @@ function getWaetherDatas() {
       console.log(res)
       data.value = { ...data.value, ...res }
       console.log(data.value)
+      getTemperatureHistory().then(() => {
+        console.log(dataHistory.value)
+        dataHistory.value = dataHistory.value.map((element) => {
+          labelData.value.push(getHourFromDateString(element.time))
+          return element.temp
+        })
+        console.log(dataHistory.value)
+        chartData.value = setChartData()
+        // console.log(chartData.value)
+        chartOptions.value = setChartOptions()
+        // console.log(chartOptions.value)
+      })
     })
   })
 }
+async function getTemperatureHistory() {
+  await api
+    .getData(api.apiUrl + `/weather/temperature?city=${countryName.value}`)
+    .then((res) => {
+      // console.log(res.temperature_data)
+      dataHistory.value = res.temperature_data
+    })
+    .catch(() => {
+      console.log('Failed to get temperature history')
+    })
+}
+
+function getHourFromDateString(dateString: string): string {
+  const date = new Date(dateString)
+  const hours = date.getUTCHours().toString().padStart(2, '0')
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0')
+
+  return `${hours}:${minutes}`
+}
+
+// onMounted(async () => {
+//   getTemperatureHistory().then(() => {
+//     console.log(dataHistory.value)
+//     dataHistory.value = dataHistory.value.map((element) => {
+//       labelData.value.push(getHourFromDateString(element.time))
+//       return element.temp
+//     })
+//     console.log(dataHistory.value)
+//     chartData.value = setChartData()
+//     // console.log(chartData.value)
+//     chartOptions.value = setChartOptions()
+//     // console.log(chartOptions.value)
+//   })
+// })
 
 // onMounted(() => {})
 </script>
@@ -119,10 +237,10 @@ function getWaetherDatas() {
           <p>Sunday | 12 Dec 2023</p>
         </div>
       </div>
-      <div><img src="/icons/weather.svg" alt="weather_icon" /></div>
+      <div><img src="/icons/weather.svg" alt="weather_icon" class="h-32" /></div>
     </div>
     <!-- Second part -->
-    <div class="w-full h-full flex gap-4 items-center justify-between">
+    <div class="w-full h-full flex gap-4 justify-between">
       <div
         class="blurEffect h-full rounded-3xl min-w-16 flex flex-col justify-between items-center py-4"
       >
@@ -167,14 +285,19 @@ function getWaetherDatas() {
           />
           <div
             class="bg-white rounded-lg min-w-10 min-h-10 flex items-center justify-center cursor-pointer"
-            @click="() => getWaetherDatas()"
+            @click="
+              () => {
+                getWaetherDatas()
+                displayCityInput = false
+              }
+            "
           >
             <img src="/icons/search.svg" alt="search" class="w-8 h-8" />
           </div>
         </div>
       </div>
-      <div class="w-full relative h-full flex flex-col gap-4">
-        <div class="blurEffect w-full pl-4 flex flex-col gap-10 h-full rounded-3xl">
+      <div class="w-full h-full relative flex flex-col gap-4">
+        <div class="blurEffect w-full pl-4 flex py-4 justify-around h-fit rounded-3xl">
           <div class="flex items-center py-4 px-4">
             <img src="/icons/location.svg" alt="location" />
             <p>{{ data.city || 'Select city' }}</p>
@@ -200,18 +323,20 @@ function getWaetherDatas() {
             </div>
           </div>
         </div>
-        <div class="blurEffect w-full h-full rounded-3xl pl-8 pt-4">
+        <div class="blurEffect w-full h-full flex flex-col rounded-3xl pl-8 pr-8 pb-4 pt-4">
           <div class="flex items-center">
             <img src="/icons/clock.svg" alt="clock" />
             <p>Evolution de la temperature dans les 24 derniere heures</p>
           </div>
-          <div class="pt-16 text-center text-xl">Coming soon</div>
+          <div class="pt-2 text-center h-full text-xl">
+            <Chart type="line" :data="chartData" :options="chartOptions" class="h-full" />
+          </div>
         </div>
       </div>
       <div class="blurEffect h-full min-w-72 flex flex-col gap-10 py-8 items-center rounded-3xl">
-        <div class="flex items-center">
+        <div class="flex items-center px-2 text-center">
           <img src="/icons/clock.svg" alt="clock" />
-          <p>8:00PM GMT</p>
+          <p>{{ new Date() }}</p>
         </div>
         <!--  -->
         <div class="w-full px-6 flex flex-col gap-2">
